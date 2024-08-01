@@ -39,18 +39,16 @@ private:
 	IModel* skybox, * ground;	// Game models/assets
 	States Game_State;
 	IFont* gameFont, * Small_Font;
-	bool gamePaused;
 	float frameRate, cameraForwardsLimit, cameraBackwardsLimit, cameraLeftLimit, cameraRightLimit, cameraSpeed;
 	float rotationSpeed = 15.0f;  // Degrees per second
 	float maxRotation = 50.0f;    // Maximum rotation angle in degrees
 	float Marble_Rotation = 0.0f; // Track the current rotation around Y axis
 	float kGameSpeed;
 	vector<vector<Block>> Blocks; // 2D vector of blocks
-	vector<IModel*> Check_Points, Isles, Hiddent_Path, Speed_Package;
 	IModel* marble, * arrow, * dummy; // Vector to store checkpoints & Isles
 	vector<vector<IModel*>> barriers; // 2D vector for two walls
 public:
-	Killer_Quebes() : Game_State(States::Ready), gamePaused(false), frameRate(0.0f), cameraForwardsLimit(620.0f), cameraBackwardsLimit(-140.0f), cameraLeftLimit(0.0f), cameraRightLimit(420.0f), cameraSpeed(20.0f)
+	Killer_Quebes() : Game_State(States::Ready), frameRate(0.0f), cameraForwardsLimit(620.0f), cameraBackwardsLimit(-140.0f), cameraLeftLimit(0.0f), cameraRightLimit(420.0f), cameraSpeed(20.0f)
 	{
 		kGameSpeed = 20.0f;
 		rotationSpeed = 10.0f;  // Degrees per second
@@ -65,7 +63,7 @@ public:
 		ground = engine->LoadMesh("Floor.x")->CreateModel(0, -5, 0);	//floor model at the default position
 		skybox = engine->LoadMesh("Skybox_Hell.x")->CreateModel(0, -1000, 0);
 
-		IMesh* MarbleMesh, * BlocksMesh, * BarriersMesh;
+		IMesh* BlocksMesh, * BarriersMesh;
 		BlocksMesh = engine->LoadMesh("Block.x"); //PathTransparent
 		BarriersMesh = engine->LoadMesh("Barrier.x"); //PathTransparent
 		marble = engine->LoadMesh("Marble.x")->CreateModel(0, 5, 0);
@@ -113,6 +111,7 @@ public:
 			rowBlocks.push_back(block);
 		}
 		Blocks.push_back(rowBlocks);
+		rowBlocks.clear();
 		for (int i = 0; i < 10; ++i) {
 			Block block;
 			block.Block_Model = BlocksMesh->CreateModel(startX + i * (blockWidth + gap), 4, 132);
@@ -244,102 +243,57 @@ public:
 			frameRate = engine->Timer();
 			engine->DrawScene();
 			Print_Game_states();
-			if (!gamePaused)
+
+			switch (Game_State)
 			{
-				switch (Game_State)
+			case States::Ready: {
+				camera->RotateY(engine->GetMouseMovementX() * 0.1f);
+				gameFont->Draw("Press space bar to Fire!", 500, 200, kBlack);
+
+				if (engine->KeyHeld(Key_Z))
 				{
-				case States::Ready: {
-					camera->RotateY(engine->GetMouseMovementX() * 0.1f);
-					gameFont->Draw("Press space bar to Fire!", 500, 200, kBlack);
-
-					if (engine->KeyHeld(Key_Z))
+					if (Marble_Rotation < maxRotation)
 					{
-						if (Marble_Rotation < maxRotation)
-						{
-							rotationAmount = rotationSpeed * frameRate;
-							dummy->RotateLocalY(rotationAmount);
-							marble->RotateLocalY(rotationAmount);
-							Marble_Rotation += rotationAmount;
-						}
+						rotationAmount = rotationSpeed * frameRate;
+						dummy->RotateLocalY(rotationAmount);
+						marble->RotateLocalY(rotationAmount);
+						Marble_Rotation += rotationAmount;
 					}
-					if (engine->KeyHeld(Key_X))
-					{
-						if (Marble_Rotation > -maxRotation)
-						{
-							rotationAmount = -rotationSpeed * frameRate;
-							dummy->RotateLocalY(rotationAmount);
-							marble->RotateLocalY(rotationAmount);
-							Marble_Rotation += rotationAmount;
-						}
-					}
-					else if (engine->KeyHit(Key_Space))
-						Game_State = States::Firing;
-
-					collision = false;
-
-					break;
 				}
-				case States::Firing: {
-					for (int i = 0; i < 2; i++)
+				if (engine->KeyHeld(Key_X))
+				{
+					if (Marble_Rotation > -maxRotation)
 					{
-						for (int j = 0; j < 10; j++)
-						{
-							if (SphereBoxcollision(marble, barriers[i][j]))
-								barrier_collision = true;
-						}
+						rotationAmount = -rotationSpeed * frameRate;
+						dummy->RotateLocalY(rotationAmount);
+						marble->RotateLocalY(rotationAmount);
+						Marble_Rotation += rotationAmount;
 					}
-					if (barrier_collision) {
-						//cout << "Going back: " << marble->GetLocalZ() << endl;
-						//cout << "velocity_X: " << velocity_X << "  velocity_Y: " << velocity_Y << "  velocity_Z: " << velocity_Z << endl;
-
-						//marble->MoveLocalX(velocity_X);
-						//marble->MoveLocalY(velocity_Y * frameRate);
-						marble->MoveLocalZ(-kGameSpeed * frameRate);
-
-						if (marble->GetLocalZ() <= 0) {
-							cout << "Reached end" << endl;
-							barrier_collision = false;
-							marble->SetPosition(0, 5, 0);
-							marble->ResetOrientation();
-							dummy->ResetOrientation();
-							Game_State = States::Ready;
-						}
-					}
-
-					for (int row = 0; row < 2; row++)
-					{
-						for (int i = 0; i < 10; i++)
-						{
-							if (Blocks[row][i].getState() == Block_States::third)
-								continue;
-							if (SphereBoxcollision(marble, Blocks[row][i].Block_Model))
-							{
-								Blocks[row][i].incrementState();
-								collision = true;
-								//kGameSpeed = -1 * kGameSpeed;
-							}
-						}
-					}
-					if (collision == false && !barrier_collision) {
-						marble->MoveLocalZ(kGameSpeed * frameRate);
-						//marble->RotateY(kGameSpeed * frameRate);
-						//marble.
-					}
-					else if (collision) {
-						//marble->MoveLocalZ(-(5));
-						Game_State = States::Contact;
-					}
-					//Fire();
-
-
-				//arrow->ResetOrientation();
-					break;
 				}
-				case States::Contact: {
-					marble->MoveLocalZ(-kGameSpeed * frameRate);
-					//marble->MoveLocalX(velocity_X * frameRate);
+				else if (engine->KeyHit(Key_Space))
+					Game_State = States::Firing;
+
+				collision = false;
+
+				break;
+			}
+			case States::Firing: {
+				for (int i = 0; i < 2; i++)
+				{
+					for (int j = 0; j < 10; j++)
+					{
+						if (SphereBoxcollision(marble, barriers[i][j]))
+							barrier_collision = true;
+					}
+				}
+				if (barrier_collision) {
+					//cout << "Going back: " << marble->GetLocalZ() << endl;
+					//cout << "velocity_X: " << velocity_X << "  velocity_Y: " << velocity_Y << "  velocity_Z: " << velocity_Z << endl;
+
+					//marble->MoveLocalX(velocity_X);
 					//marble->MoveLocalY(velocity_Y * frameRate);
-					//marble->MoveLocalZ(velocity_Z * frameRate);
+					marble->MoveLocalZ(-kGameSpeed * frameRate);
+
 					if (marble->GetLocalZ() <= 0) {
 						cout << "Reached end" << endl;
 						barrier_collision = false;
@@ -348,75 +302,106 @@ public:
 						dummy->ResetOrientation();
 						Game_State = States::Ready;
 					}
-					if (engine->KeyHit(Key_R))
-					{
+				}
 
-						marble->SetPosition(0, 5, 0);
-						marble->ResetOrientation();
-						dummy->ResetOrientation();
-						Game_State = States::Ready;
-					}
-					int hits = 0;
-					for (const auto& row : Blocks) {
-						for (const auto& block : row) {
-							if (block.getState() == Block_States::third) {
-								hits++;
-							}
+				for (int row = 0; row < 2; row++)
+				{
+					for (int col = 0; col < 10; col++)
+					{
+						//if (Blocks[row][i].getState() == Block_States::third)
+							//continue;
+						if (SphereBoxcollision(marble, Blocks[row][col].Block_Model))
+						{
+							Blocks[row][col].incrementState();
+							collision = true;
+							break;
 						}
 					}
-					if (hits == 2 * 10)	// All blocks have been deleted
-						Game_State = States::Over;
-					break;
 				}
-				case States::Over: {
-					break;
+				if (collision == false && !barrier_collision) {
+					marble->MoveLocalZ(kGameSpeed * frameRate);
+					//marble->RotateY(kGameSpeed * frameRate);
+					//marble.
 				}
-				default:
-					break;
+				else if (collision) {
+					//marble->MoveLocalZ(-(5));
+					Game_State = States::Contact;
+				}
+				if (marble->GetLocalZ() > 150) {
+					cout << "Reached end" << endl;
+					barrier_collision = false;
+					marble->SetPosition(0, 5, 0);
+					marble->ResetOrientation();
+					dummy->ResetOrientation();
+					Game_State = States::Ready;
 				}
 
-				if (engine->KeyHit(Key_1))
-				{
-					camera->ResetOrientation();
-					//camera->SetPosition(Player_HoverCar.GetX(), Player_HoverCar.GetY() + 3.0f, Player_HoverCar.GetZ() + 3.0f);
+				//arrow->ResetOrientation();
+				break;
+			}
+			case States::Contact: {
+				marble->MoveLocalZ(kGameSpeed * frameRate);
+				//marble->MoveLocalX(velocity_X * frameRate);
+				//marble->MoveLocalY(velocity_Y * frameRate);
+				//marble->MoveLocalZ(velocity_Z * frameRate);
+				if (marble->GetLocalZ() <= 0) {
+					cout << "Reached end" << endl;
+					barrier_collision = false;
+					marble->SetPosition(0, 5, 0);
+					marble->ResetOrientation();
+					dummy->ResetOrientation();
+					Game_State = States::Ready;
 				}
-				if (engine->KeyHit(Key_C))
+				if (engine->KeyHit(Key_R))
 				{
-					camera->ResetOrientation();
-					//camera->SetPosition(Player_HoverCar.GetX(), 20.0f, Player_HoverCar.GetZ() - 40.0f);
+					marble->SetPosition(0, 5, 0);
+					marble->ResetOrientation();
+					dummy->ResetOrientation();
+					Game_State = States::Ready;
 				}
-				if (engine->KeyHit(Key_P))
-					gamePaused = true;
-
-				//if (engine->KeyHit(Key_3))
-					//camera->SetPosition(Player_HoverCar.GetX(), 20.0f, Player_HoverCar.GetZ() - 40.0f);
-				if (engine->KeyHit(Key_4))
-					camera->SetPosition(-30.0f, 80.0f, -180.0f);
-				if (engine->KeyHit(Key_2))
-					camera->SetPosition(-30.0f, 80.0f, -180.0f);
-				if (engine->KeyHit(Key_Up) && camera->GetZ() <= cameraForwardsLimit)
-					camera->MoveZ(cameraSpeed);
-				if (engine->KeyHit(Key_Down) && camera->GetZ() >= cameraBackwardsLimit)
-					camera->MoveZ(-cameraSpeed);
-				if (engine->KeyHit(Key_Left) && camera->GetX() >= cameraLeftLimit)
-					camera->MoveX(-cameraSpeed);
-				if (engine->KeyHit(Key_Right) && camera->GetX() <= cameraRightLimit)
-					camera->MoveX(cameraSpeed);
+				int hits = 0;
+				for (const auto& row : Blocks) {
+					for (const auto& block : row) {
+						if (block.getState() == Block_States::third) {
+							hits++;
+						}
+					}
+				}
+				if (hits == 2 * 10)	// All blocks have been deleted
+					Game_State = States::Over;
+				if (marble->GetLocalZ() > 150) {
+					cout << "Reached end" << endl;
+					barrier_collision = false;
+					marble->SetPosition(0, 5, 0);
+					marble->ResetOrientation();
+					dummy->ResetOrientation();
+					Game_State = States::Ready;
+				}
+				break;
+			}
+			case States::Over: {
+				break;
+			}
+			default:
+				break;
 			}
 
-			if (gamePaused && engine->KeyHit(Key_P))
-				gamePaused = false; // Game Pause/Resume
+			if (engine->KeyHit(Key_Up) && camera->GetZ() <= cameraForwardsLimit)
+				camera->MoveZ(cameraSpeed);
+			if (engine->KeyHit(Key_Down) && camera->GetZ() >= cameraBackwardsLimit)
+				camera->MoveZ(-cameraSpeed);
+			if (engine->KeyHit(Key_Left) && camera->GetX() >= cameraLeftLimit)
+				camera->MoveX(-cameraSpeed);
+			if (engine->KeyHit(Key_Right) && camera->GetX() <= cameraRightLimit)
+				camera->MoveX(cameraSpeed);
 
 			if (engine->KeyHit(Key_Escape))
 				engine->Stop(); // Quit the game //In all states, player should be able to press the Escape key to quit the game
 		}
 	}
-	void Fire() { marble->MoveLocalZ(kGameSpeed * frameRate); }
 	void Print_Game_states()
 	{
-		if (gamePaused)
-			gameFont->Draw("State: Paused", 1050, 670, kWhite);
-		else if (Game_State == States::Ready)
+		if (Game_State == States::Ready)
 			gameFont->Draw("State: Ready", 1075, 670, kWhite);
 		else if (Game_State == States::Firing)
 			gameFont->Draw("State: Firing", 1050, 670, kWhite);
@@ -425,7 +410,6 @@ public:
 		else if (Game_State == States::Over)
 			gameFont->Draw("State: Complete", 1075, 670, kWhite);
 	}
-	~Killer_Quebes() {	}
 };
 int main()
 {
