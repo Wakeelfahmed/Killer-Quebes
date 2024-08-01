@@ -4,7 +4,7 @@
 #include <windows.h>	//Sleep() for Countdown Animation
 #include <algorithm> // for sort() in positioning
 #include <cmath>        // For sqrt and abs
-
+using namespace std;
 using namespace tle;
 enum class States { Ready, Firing, Contact, Over }; // Game states	
 enum class Block_States { first, second, third };
@@ -43,12 +43,12 @@ private:
 	float frameRate, cameraForwardsLimit, cameraBackwardsLimit, cameraLeftLimit, cameraRightLimit, cameraSpeed;
 	float rotationSpeed = 15.0f;  // Degrees per second
 	float maxRotation = 50.0f;    // Maximum rotation angle in degrees
-	float currentRotation = 0.0f; // Track the current rotation around Y axis
+	float Marble_Rotation = 0.0f; // Track the current rotation around Y axis
 	float kGameSpeed;
-	std::vector<std::vector<Block>> Blocks; // 2D vector of blocks
+	vector<vector<Block>> Blocks; // 2D vector of blocks
 	vector<IModel*> Check_Points, Isles, Hiddent_Path, Speed_Package;
 	IModel* marble, * arrow, * dummy; // Vector to store checkpoints & Isles
-	std::vector<std::vector<IModel*>> barriers; // 2D vector for two walls
+	vector<vector<IModel*>> barriers; // 2D vector for two walls
 public:
 	Killer_Quebes() : Game_State(States::Ready), gamePaused(false), frameRate(0.0f), cameraForwardsLimit(620.0f), cameraBackwardsLimit(-140.0f), cameraLeftLimit(0.0f), cameraRightLimit(420.0f), cameraSpeed(20.0f)
 	{
@@ -75,8 +75,8 @@ public:
 		float startZ = 0.0f; // Starting Z position
 		float gapZ = 18.0f; // Gap between barriers
 
-		std::vector<IModel*> rowbarrier1; // Vector for each row
-		std::vector<IModel*> rowbarrier2; // Vector for each row
+		vector<IModel*> rowbarrier1; // Vector for each row
+		vector<IModel*> rowbarrier2; // Vector for each row
 		for (int i = 0; i < 10; ++i) {
 			float zPos = i * gapZ;
 
@@ -105,7 +105,7 @@ public:
 		float gap = 2.0f;
 		float totalWidth = (10 * blockWidth) + (9 * gap);
 		float startX = -totalWidth / 2 + blockWidth / 2;
-		std::vector<Block> rowBlocks; // Vector for each row
+		vector<Block> rowBlocks; // Vector for each row
 
 		for (int i = 0; i < 10; ++i) {
 			Block block;
@@ -127,7 +127,7 @@ public:
 		//camera = engine->CreateCamera(kManual, 0.0f, 150, 0);
 		//camera->RotateX(90.0f);
 	}
-	bool SphereBoxcollision(IModel* sphere, IModel* box, float& velocity_X, float& velocity_Y, float& velocity_Z) {
+	bool SphereBoxcollision(IModel* sphere, IModel* box) {
 		// Get the sphere's center and radius
 		float sphereCenterX = sphere->GetX();
 		float sphereCenterY = sphere->GetY();
@@ -162,27 +162,83 @@ public:
 
 		// Check if the distance is less than or equal to the sphere's radius
 		bool collision = distanceSquared <= sphereRadius * sphereRadius;
-
 		if (collision) {
-			// Determine which axis the collision occurred on
-			if (closestX == boxMinX || closestX == boxMaxX) {
-				velocity_X = -velocity_X; // Invert X component
+			// Determine the main axis of collision and calculate the new direction
+			float dx = sphereCenterX - boxCenterX;
+			float dy = sphereCenterY - boxCenterY;
+
+			float current_Rotation = Marble_Rotation;
+			float newRotation;
+
+			if (std::abs(dx) > std::abs(dy)) {
+				// Horizontal collision
+				if (dx > 0) {
+					// Collided with the left side of the box
+					newRotation = -current_Rotation + 180.0f;
+				}
+				else {
+					// Collided with the right side of the box
+					newRotation = -current_Rotation + 180.0f;
+				}
 			}
-			else if (closestY == boxMinY || closestY == boxMaxY) {
-				velocity_Y = -velocity_Y; // Invert Y component
+			else {
+				// Vertical collision
+				if (dy > 0) {
+					// Collided with the bottom side of the box
+					newRotation = -current_Rotation;
+				}
+				else {
+					// Collided with the top side of the box
+					newRotation = -current_Rotation;
+				}
 			}
-			else if (closestZ == boxMinZ || closestZ == boxMaxZ) {
-				velocity_Z = -velocity_Z; // Invert Z component
-			}
+
+			// Ensure the new rotation is within the correct bounds
+			newRotation = std::fmod(newRotation, 360.0f);
+			if (newRotation < 0)
+				newRotation += 360.0f;
+
+			sphere->RotateY(newRotation - current_Rotation); // Apply the rotation difference
 		}
+
+
+		//if (collision) {
+		//	// Determine the direction of the collision and adjust the marble's direction accordingly
+		//	float dx = sphereCenterX - boxCenterX;
+		//	float dy = sphereCenterY - boxCenterY;
+
+		//	// Determine the main axis of collision (horizontal or vertical)
+		//	if (std::abs(dx) > std::abs(dy)) {
+		//		// Horizontal collision
+		//		if (dx > 0) {
+		//			// Collided with the left side of the box
+		//			sphere->RotateLocalY(180.0f); // Reverse direction
+		//		}
+		//		else {
+		//			// Collided with the right side of the box
+		//			sphere->RotateLocalY(180.0f); // Reverse direction
+		//		}
+		//	}
+		//	else {
+		//		// Vertical collision
+		//		if (dy > 0) {
+		//			// Collided with the bottom side of the box
+		//			sphere->RotateLocalY(180.0f); // Reverse direction
+		//		}
+		//		else {
+		//			// Collided with the top side of the box
+		//			sphere->RotateLocalY(180.0f); // Reverse direction
+		//		}
+		//	}
+		//}		
+		//
 		return collision;
 	}
 	void run()
 	{
 		float rotationAmount;
 		bool collision = false, barrier_collision = false;
-		float velocity_X, velocity_Y, velocity_Z;
-		ISprite* RaceResults_and_Restart = engine->CreateSprite("Canvas.tga", -350, -350, 0.0f);
+		//float velocity_X = 0, velocity_Y = 0, velocity_Z = kGameSpeed;
 		while (engine->IsRunning())
 		{
 			frameRate = engine->Timer();
@@ -198,22 +254,22 @@ public:
 
 					if (engine->KeyHeld(Key_Z))
 					{
-						if (currentRotation < maxRotation)
+						if (Marble_Rotation < maxRotation)
 						{
 							rotationAmount = rotationSpeed * frameRate;
 							dummy->RotateLocalY(rotationAmount);
 							marble->RotateLocalY(rotationAmount);
-							currentRotation += rotationAmount;
+							Marble_Rotation += rotationAmount;
 						}
 					}
 					if (engine->KeyHeld(Key_X))
 					{
-						if (currentRotation > -maxRotation)
+						if (Marble_Rotation > -maxRotation)
 						{
 							rotationAmount = -rotationSpeed * frameRate;
 							dummy->RotateLocalY(rotationAmount);
 							marble->RotateLocalY(rotationAmount);
-							currentRotation += rotationAmount;
+							Marble_Rotation += rotationAmount;
 						}
 					}
 					else if (engine->KeyHit(Key_Space))
@@ -224,24 +280,24 @@ public:
 					break;
 				}
 				case States::Firing: {
-
 					for (int i = 0; i < 2; i++)
 					{
 						for (int j = 0; j < 10; j++)
 						{
-							if (SphereBoxcollision(marble, barriers[i][j], velocity_X, velocity_Y, velocity_Z))
+							if (SphereBoxcollision(marble, barriers[i][j]))
 								barrier_collision = true;
 						}
 					}
 					if (barrier_collision) {
-						std::cout << "Going back: " << marble->GetLocalZ() << endl;
-						//marble->MoveLocalZ(-kGameSpeed * frameRate);
-						marble->MoveLocalX(velocity_X * frameRate);
-						marble->MoveLocalY(velocity_Y * frameRate);
-						marble->MoveLocalZ(velocity_Z * frameRate);
+						//cout << "Going back: " << marble->GetLocalZ() << endl;
+						//cout << "velocity_X: " << velocity_X << "  velocity_Y: " << velocity_Y << "  velocity_Z: " << velocity_Z << endl;
+
+						//marble->MoveLocalX(velocity_X);
+						//marble->MoveLocalY(velocity_Y * frameRate);
+						marble->MoveLocalZ(-kGameSpeed * frameRate);
 
 						if (marble->GetLocalZ() <= 0) {
-							std::cout << "Reached end" << endl;
+							cout << "Reached end" << endl;
 							barrier_collision = false;
 							marble->SetPosition(0, 5, 0);
 							marble->ResetOrientation();
@@ -256,7 +312,7 @@ public:
 						{
 							if (Blocks[row][i].getState() == Block_States::third)
 								continue;
-							if (SphereBoxcollision(marble, Blocks[row][i].Block_Model, velocity_X, velocity_Y, velocity_Z))
+							if (SphereBoxcollision(marble, Blocks[row][i].Block_Model))
 							{
 								Blocks[row][i].incrementState();
 								collision = true;
@@ -281,8 +337,11 @@ public:
 				}
 				case States::Contact: {
 					marble->MoveLocalZ(-kGameSpeed * frameRate);
+					//marble->MoveLocalX(velocity_X * frameRate);
+					//marble->MoveLocalY(velocity_Y * frameRate);
+					//marble->MoveLocalZ(velocity_Z * frameRate);
 					if (marble->GetLocalZ() <= 0) {
-						std::cout << "Reached end" << endl;
+						cout << "Reached end" << endl;
 						barrier_collision = false;
 						marble->SetPosition(0, 5, 0);
 						marble->ResetOrientation();
